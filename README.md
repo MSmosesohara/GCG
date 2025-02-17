@@ -32,4 +32,4 @@ Specify in pairs the BCM number you want to monitor and the friednly name you wa
 
 ## Screenshots
 
-![Screenshot](\images\GCG_Logging_01.png)
+![Screenshot](/images/GCG_Logging_01.png)
