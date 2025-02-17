@@ -79,6 +79,7 @@ curses.noecho()
 curses.cbreak()
 stdscr.keypad(True)
 stdscr.nodelay(True)  # Make getch() non-blocking
+curses.curs_set(0)  # Hide the cursor
 
 # Initialize database
 db_conn = init_db(db_name)
@@ -86,7 +87,7 @@ logging_enabled = False
 
 # Function to update the display
 def update_display(stdscr, pin_states, paused, logging_enabled):
-    stdscr.clear()
+    stdscr.erase()  # Use erase instead of clear to reduce flicker
     if paused:
         stdscr.addstr(0, 0, "PAUSED", curses.color_pair(3))
     if logging_enabled:
@@ -132,5 +133,6 @@ finally:
     stdscr.keypad(False)
     curses.echo()
     curses.endwin()
+    curses.curs_set(1)  # Restore the cursor
     GPIO.cleanup()
     db_conn.close()
