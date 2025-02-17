@@ -1,0 +1,24 @@
+4:Game In Use
+6:Ticket Driver
+24:Ticket Notch
+12:Joystick North
+16:Joystick South
+23:Joystick West
+25:Joystick East 
+21:Claw Down
+20:Claw Up
+22:ActuateSolenoidPin
+26:GantryStartPosition
+19:BallDropPermimiter
+9:ClawEastLimitPin
+11:CLawNorthLimit
+17:ClawDownInidcatorPin
+7:ClawDownLimitPin
+14:LoosingBallDrop
+27:WinningBallDrop
+13:SpinMotorOnPin
+5:MonitorPlatterSpeed
+18:WS281xPwmPin
+polling_speed:0.1
+history_length:50
+db_path:/var/lib/user/
