@@ -1,6 +1,6 @@
 # GCG
 
-![GCG Logo](/path/to/GCG_Logo.png)
+![GCG Logo](/images/GCG_Logo.png)
 
 GCG Charts GPIOs - Uses ncurses and python to render GPIO logic to the console  
 
