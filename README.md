@@ -1,7 +1,5 @@
 # GCG
-
 ![GCG Logo](/images/GCG_Logo.png)
-
 GCG Charts GPIOs - Uses ncurses and python to render GPIO logic to the console  
 
 ## Dependencies
