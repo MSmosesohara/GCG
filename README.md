@@ -16,6 +16,7 @@ Ncurseson top of python to render GPIO logic to the console
 |------------|-----------------------------------|
 | p    | Pauses the logging output on the screen  |
 | l     | write GPIO output to SQLite file             |
+| v     | Enable / Disable Vectorscope            |
 
 # Configuration Options
 
@@ -24,6 +25,8 @@ Ncurseson top of python to render GPIO logic to the console
 - **polling_speed**: Sets the interval (in seconds) for polling the GPIO pins.
 - **history_length**: Specifies the length of the history to be maintained.
 - **db_path**: Specifies the path to the SQLite database file.
+- **north:12 south:16 east:25 west:23**: Used to map BCM pin number to direction for Vectorscope
+- **scale**: Used to change the size of the vectorscope movement 
 
 - **Pin Monitoring Designations**:
 Specify in pairs the BCM number you want to monitor and the friendly name you want to give it seperated by a colon e.g.:
