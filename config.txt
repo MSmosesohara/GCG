@@ -4,7 +4,7 @@
 12:Joystick North
 16:Joystick South
 23:Joystick West
-25:Joystick East 
+25:Joystick East
 21:Claw Down
 20:Claw Up
 22:ActuateSolenoidPin
@@ -18,7 +18,13 @@
 27:WinningBallDrop
 13:SpinMotorOnPin
 5:MonitorPlatterSpeed
-18:WS281xPwmPin
+18:AgitatorMotor
 polling_speed:0.1
-history_length:50
-db_path:/var/lib/user/
+history_length:150
+db_path:/var/lib/arcade
+scale:10
+# Directional mappings for the vectorscope
+north:12
+south:16
+east:25
+west:23
