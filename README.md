@@ -1,8 +1,6 @@
-# GCG
-
-![GCG Logo](/path/to/GCG_Logo.png)
-
-GCG Charts GPIOs - Uses ncurses and python to render GPIO logic to the console  
+# GCG - GCG Charts GPIOs
+![GCG Logo](/images/GCG_Logo.png)
+Ncurseson top of python to render GPIO logic to the console  
 
 ## Dependencies
 
@@ -28,7 +26,7 @@ GCG Charts GPIOs - Uses ncurses and python to render GPIO logic to the console
 - **db_path**: Specifies the path to the SQLite database file.
 
 - **Pin Monitoring Designations**:
-Specify in pairs the BCM number you want to monitor and the friednly name you want to give it specrated by a colon e.g.:
+Specify in pairs the BCM number you want to monitor and the friendly name you want to give it seperated by a colon e.g.:
 
 18:MyPin
 
