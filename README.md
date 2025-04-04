@@ -33,6 +33,9 @@ Specify in pairs the BCM number you want to monitor and the friendly name you wa
 
 18:MyPin
 
+## Demo Video
+
+[Watch the video](/images/Demo_Video.mp4)
 
 ## Screenshots
 
