@@ -85,28 +85,52 @@ curses.curs_set(0)  # Hide the cursor
 db_conn = init_db(db_name)
 logging_enabled = False
 
-# Function to update the display
-def update_display(stdscr, pin_states, paused, logging_enabled):
-    stdscr.erase()  # Use erase instead of clear to reduce flicker
+# Create windows for main display and vectorscope
+height, width = stdscr.getmaxyx()
+main_win = curses.newwin(height, width // 2, 0, 0)
+vector_win = curses.newwin(height, width // 2, 0, width // 2)
+
+# Function to update the main display
+def update_main_display(win, pin_states, paused, logging_enabled):
+    win.erase()  # Use erase instead of clear to reduce flicker
     if paused:
-        stdscr.addstr(0, 0, "PAUSED", curses.color_pair(3))
+        win.addstr(0, 0, "PAUSED", curses.color_pair(3))
     if logging_enabled:
-        stdscr.addstr(0, 10, "LOGGING ENABLED", curses.color_pair(4))
+        win.addstr(0, 10, "LOGGING ENABLED", curses.color_pair(4))
     
     max_label_length = max(len(label) for label in labels.values())
     graph_start_col = max_label_length + 15  # Adjust this value to align the graph correctly
     
     for idx, (pin, states) in enumerate(pin_states.items()):
         label = labels.get(pin, f"BCM {pin}")
-        stdscr.addstr(idx + 2, 0, f"{label.ljust(max_label_length)} BCM {pin}: ")
-        stdscr.addstr(idx + 2, graph_start_col, "")  # Align the start of the graph
+        win.addstr(idx + 2, 0, f"{label.ljust(max_label_length)} BCM {pin}: ")
+        win.addstr(idx + 2, graph_start_col, "")  # Align the start of the graph
         for state in states:
             if state:
-                stdscr.addstr("-", curses.color_pair(1))
+                win.addstr("-", curses.color_pair(1))
             else:
-                stdscr.addstr("_", curses.color_pair(2))
-        stdscr.addstr("\n")
-    stdscr.refresh()
+                win.addstr("_", curses.color_pair(2))
+        win.addstr("\n")
+    win.refresh()
+
+# Function to update the vectorscope display
+def update_vector_display(win, pin_states):
+    win.erase()  # Use erase instead of clear to reduce flicker
+    win.box()
+    win.addstr(0, 2, "Vectorscope")
+    
+    # Example directional controls (replace with actual pins)
+    north = pin_states.get(12, [0])[-1]
+    south = pin_states.get(16, [0])[-1]
+    east = pin_states.get(1, [0])[-1]
+    west = pin_states.get(7, [0])[-1]
+    
+    center_y, center_x = win.getmaxyx()[0] // 2, win.getmaxyx()[1] // 2
+    y = center_y - (north - south)
+    x = center_x + (east - west)
+    
+    win.addstr(y, x, "O", curses.color_pair(1))
+    win.refresh()
 
 # Main loop
 try:
@@ -126,7 +150,8 @@ try:
                     pin_states[pin].pop(0)
             if logging_enabled:
                 log_gpio_values(db_conn, pin_states, labels)
-        update_display(stdscr, pin_states, paused, logging_enabled)
+        update_main_display(main_win, pin_states, paused, logging_enabled)
+        update_vector_display(vector_win, pin_states)
         time.sleep(polling_speed)
 finally:
     curses.nocbreak()
