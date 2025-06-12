@@ -93,11 +93,6 @@ curses.curs_set(0)  # Hide the cursor
 db_conn = init_db(db_name)
 logging_enabled = False
 
-# Create windows for main display and vectorscope
-height, width = stdscr.getmaxyx()
-main_win = curses.newwin(height, width // 2, 0, 0)
-vector_win = curses.newwin(height, width // 2, 0, width // 2)
-
 # Function to update the main display
 def update_main_display(win, pin_states, paused, logging_enabled):
     win.erase()  # Use erase instead of clear to reduce flicker
@@ -197,10 +192,28 @@ try:
     paused = False
     vector_graph_visible = False  # Flag to track vector graph visibility
 
+    # Initial window setup
+    height, width = stdscr.getmaxyx()
+    main_win = curses.newwin(height, width, 0, 0)
+    vector_win = None
+
     while True:
+        # Check if window size or vector_graph_visible changed, and recreate windows if needed
+        new_height, new_width = stdscr.getmaxyx()
+        if (new_height, new_width) != (height, width) or \
+           (vector_graph_visible and main_win.getmaxyx()[1] != new_width // 2) or \
+           (not vector_graph_visible and main_win.getmaxyx()[1] != new_width):
+            height, width = new_height, new_width
+            if vector_graph_visible:
+                main_win = curses.newwin(height, width // 2, 0, 0)
+                vector_win = curses.newwin(height, width // 2, 0, width // 2)
+            else:
+                main_win = curses.newwin(height, width, 0, 0)
+                vector_win = None
+
         key = stdscr.getch()
-        if key != -1:  # Check if a key was pressed
-            stdscr.addstr(0, 30, f"Key pressed: {key}")  # Debug: Display the key code
+        if key != -1:
+            stdscr.addstr(0, 30, f"Key pressed: {key}")
             stdscr.refresh()
 
         if key == ord('p'):
@@ -208,9 +221,11 @@ try:
         elif key == ord('l'):
             logging_enabled = not logging_enabled
         elif key == ord('v'):
-            vector_graph_visible = not vector_graph_visible  # Toggle vector graph visibility
-            stdscr.addstr(1, 30, f"Vector graph visible: {vector_graph_visible}")  # Debug: Display visibility status
+            vector_graph_visible = not vector_graph_visible
+            stdscr.addstr(1, 30, f"Vector graph visible: {vector_graph_visible}")
             stdscr.refresh()
+            # Force window recreation on toggle
+            height, width = 0, 0
 
         if not paused:
             for pin in pins:
@@ -225,11 +240,11 @@ try:
         update_main_display(main_win, pin_states, paused, logging_enabled)
 
         # Conditionally update or clear the vector graph display
-        if vector_graph_visible:
+        if vector_graph_visible and vector_win:
             update_vector_display(vector_win, pin_states, scale, directions)
-        else:
-            vector_win.erase()  # Clear the vector graph window
-            vector_win.refresh()  # Refresh to apply the changes
+        elif vector_win:
+            vector_win.erase()
+            vector_win.refresh()
 
         time.sleep(polling_speed)
 finally:
