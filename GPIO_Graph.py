@@ -95,12 +95,10 @@ logging_enabled = False
 
 # Function to update the main display
 def update_main_display(win, pin_states, paused, logging_enabled):
-    win.erase()  # Use erase instead of clear to reduce flicker
-
-    # Add help/shortcut keys at the top
+    win.erase()
     help_text = (
-        "Shortcuts: <p> Pause/Resume  <l> Toggle Logging  <v> Toggle Vectorscope  "
-        "< [ > Decrease History  < ] > Increase History  <Ctrl+C> Quit"
+        "Keys: <p> Pause  <l> DB Logging  <v> Vectorscope  "
+        "[ Dec History  ] Inc History  - Dec Polling  + Inc Polling  <Ctrl+C> Quit"
     )
     win.addstr(0, 0, help_text, curses.A_BOLD)
 
@@ -245,8 +243,11 @@ try:
         elif key == ord(']'):
             history_length += 1
             for pin in pin_states:
-                # Prepend zeros if needed to maintain the new length
                 pin_states[pin] = [0] * (history_length - len(pin_states[pin])) + pin_states[pin]
+        elif key == ord('-'):
+            polling_speed = max(0.01, polling_speed - 0.01)  # Don't go below 0.01s
+        elif key == ord('+') or key == ord('='):
+            polling_speed += 0.01
 
         if not paused:
             for pin in pins:
