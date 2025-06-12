@@ -83,6 +83,7 @@ curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
 curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
 curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_RED)  # Red background for pause indicator
 curses.init_pair(4, curses.COLOR_BLACK, curses.COLOR_GREEN)  # Green background for logging indicator
+curses.init_pair(5, curses.COLOR_WHITE, curses.COLOR_BLACK)  # Light grey border
 curses.noecho()
 curses.cbreak()
 stdscr.keypad(True)
@@ -96,44 +97,11 @@ logging_enabled = False
 # Function to update the main display
 def update_main_display(win, pin_states, paused, logging_enabled):
     win.erase()
-    help_text = (
-        "Keys:<v> Vectorscope  "
-        "<Ctrl+C> Quit"
-    )
-    win.addstr(0, 0, help_text, curses.A_BOLD)
-
-    # Build the status line
-    status_text = (
-        f"PAUSED<p>: {'YES' if paused else 'NO'}   "
-        f"LOGGING<l>: {'YES' if logging_enabled else 'NO'}   "
-        f"POLLING<-/+>: {polling_speed:.2f}s   "
-        f"HISTORY<[/]>: {history_length}"
-    )
-
-    # Get window width
-    win_height, win_width = win.getmaxyx()
-
-    # Split status_text into lines that fit the window width
-    status_lines = []
-    while status_text:
-        # Find the last space within the width limit
-        if len(status_text) <= win_width:
-            status_lines.append(status_text)
-            break
-        split_at = status_text.rfind(' ', 0, win_width)
-        if split_at == -1:
-            split_at = win_width  # No space found, hard split
-        status_lines.append(status_text[:split_at])
-        status_text = status_text[split_at:].lstrip()
-
-    # Print each status line
-    for i, line in enumerate(status_lines):
-        win.addstr(1 + i, 0, line, curses.A_BOLD)
-
-    row = 1 + len(status_lines)  # Start graph output below status lines
 
     max_label_length = max(len(label) for label in labels.values())
     graph_start_col = max_label_length + 15  # Adjust this value to align the graph correctly
+
+    row = 0  # Start at the top of the main panel
 
     for idx, (pin, states) in enumerate(pin_states.items()):
         label = labels.get(pin, f"BCM {pin}")
@@ -213,6 +181,40 @@ def update_vector_display(win, pin_states, scale, directions):
 
     win.refresh()
 
+# Function to update the header display
+def update_header(win, paused, logging_enabled, polling_speed, history_length):
+    win.erase()
+    win.attron(curses.color_pair(5))
+    win.box()  # Draw a thin border
+    win.attroff(curses.color_pair(5))
+    help_text = (
+        "Keys: <v> Vectorscope  <p> Pause  <l> Logging  "
+        "[/]: History  -/+: Polling  <Ctrl+C> Quit"
+    )
+    status_text = (
+        f"PAUSED: {'YES' if paused else 'NO'}   "
+        f"LOGGING: {'YES' if logging_enabled else 'NO'}   "
+        f"POLLING: {polling_speed:.2f}s   "
+        f"HISTORY: {history_length}"
+    )
+
+    win_height, win_width = win.getmaxyx()
+    lines = [help_text]
+    while status_text:
+        if len(status_text) <= win_width - 2:  # -2 for border
+            lines.append(status_text)
+            break
+        split_at = status_text.rfind(' ', 0, win_width - 2)
+        if split_at == -1:
+            split_at = win_width - 2
+        lines.append(status_text[:split_at])
+        status_text = status_text[split_at:].lstrip()
+
+    for i, line in enumerate(lines):
+        if i + 1 < win_height - 1:  # Stay inside the border
+            win.addstr(i + 1, 1, line, curses.A_BOLD)
+    win.refresh()
+
 # Read configuration
 labels, pins, polling_speed, history_length, db_path, scale, directions = read_config('config.txt')
 
@@ -221,11 +223,12 @@ labels, pins, polling_speed, history_length, db_path, scale, directions = read_c
 try:
     pin_states = {pin: [0] * history_length for pin in pins}
     paused = False
-    vector_graph_visible = False  # Flag to track vector graph visibility
+    vector_graph_visible = False
 
-    # Initial window setup
+    header_height = 4
     height, width = stdscr.getmaxyx()
-    main_win = curses.newwin(height, width, 0, 0)
+    header_win = curses.newwin(header_height, width, 0, 0)
+    main_win = curses.newwin(height - header_height, width, header_height, 0)
     vector_win = None
 
     while True:
@@ -235,11 +238,12 @@ try:
            (vector_graph_visible and main_win.getmaxyx()[1] != new_width // 2) or \
            (not vector_graph_visible and main_win.getmaxyx()[1] != new_width):
             height, width = new_height, new_width
+            header_win = curses.newwin(header_height, width, 0, 0)
             if vector_graph_visible:
-                main_win = curses.newwin(height, width // 2, 0, 0)
-                vector_win = curses.newwin(height, width // 2, 0, width // 2)
+                main_win = curses.newwin(height - header_height, width // 2, header_height, 0)
+                vector_win = curses.newwin(height - header_height, width // 2, header_height, width // 2)
             else:
-                main_win = curses.newwin(height, width, 0, 0)
+                main_win = curses.newwin(height - header_height, width, header_height, 0)
                 vector_win = None
 
         key = stdscr.getch()
@@ -279,6 +283,9 @@ try:
                     pin_states[pin].pop(0)
             if logging_enabled:
                 log_gpio_values(db_conn, pin_states, labels)
+
+        # Update the header panel
+        update_header(header_win, paused, logging_enabled, polling_speed, history_length)
 
         # Update the main display
         update_main_display(main_win, pin_states, paused, logging_enabled)
