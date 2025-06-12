@@ -226,6 +226,16 @@ try:
             stdscr.refresh()
             # Force window recreation on toggle
             height, width = 0, 0
+        elif key == ord('['):
+            if history_length > 1:
+                history_length -= 1
+                for pin in pin_states:
+                    pin_states[pin] = pin_states[pin][-history_length:]
+        elif key == ord(']'):
+            history_length += 1
+            for pin in pin_states:
+                # Prepend zeros if needed to maintain the new length
+                pin_states[pin] = [0] * (history_length - len(pin_states[pin])) + pin_states[pin]
 
         if not paused:
             for pin in pins:
