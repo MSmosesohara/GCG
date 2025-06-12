@@ -195,7 +195,7 @@ labels, pins, polling_speed, history_length, db_path, scale, directions = read_c
 try:
     pin_states = {pin: [0] * history_length for pin in pins}
     paused = False
-    vector_graph_visible = True  # Flag to track vector graph visibility
+    vector_graph_visible = False  # Flag to track vector graph visibility
 
     while True:
         key = stdscr.getch()
