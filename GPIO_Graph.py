@@ -96,18 +96,29 @@ logging_enabled = False
 # Function to update the main display
 def update_main_display(win, pin_states, paused, logging_enabled):
     win.erase()  # Use erase instead of clear to reduce flicker
+
+    # Add help/shortcut keys at the top
+    help_text = (
+        "Shortcuts: <p> Pause/Resume  <l> Toggle Logging  <v> Toggle Vectorscope  "
+        "< [ > Decrease History  < ] > Increase History  <Ctrl+C> Quit"
+    )
+    win.addstr(0, 0, help_text, curses.A_BOLD)
+
+    row = 1
     if paused:
-        win.addstr(0, 0, "PAUSED", curses.color_pair(3))
+        win.addstr(row, 0, "PAUSED", curses.color_pair(3))
+        row += 1
     if logging_enabled:
-        win.addstr(0, 10, "LOGGING ENABLED", curses.color_pair(4))
-    
+        win.addstr(row, 10, "LOGGING ENABLED", curses.color_pair(4))
+        row += 1
+
     max_label_length = max(len(label) for label in labels.values())
     graph_start_col = max_label_length + 15  # Adjust this value to align the graph correctly
-    
+
     for idx, (pin, states) in enumerate(pin_states.items()):
         label = labels.get(pin, f"BCM {pin}")
-        win.addstr(idx + 2, 0, f"{label.ljust(max_label_length)} BCM {pin}: ")
-        win.addstr(idx + 2, graph_start_col, "")  # Align the start of the graph
+        win.addstr(idx + row, 0, f"{label.ljust(max_label_length)} BCM {pin}: ")
+        win.addstr(idx + row, graph_start_col, "")  # Align the start of the graph
         for state in states:
             if state:
                 win.addstr("-", curses.color_pair(1))
