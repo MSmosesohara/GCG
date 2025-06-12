@@ -94,6 +94,73 @@ curses.curs_set(0)  # Hide the cursor
 db_conn = init_db(db_name)
 logging_enabled = False
 
+
+def file_requester(stdscr, initial_path="."):
+    import os
+    curses.curs_set(1)
+    path = os.path.abspath(initial_path)
+    files = []
+    selected = 0
+    input_mode = False
+    filename = ""
+
+    while True:
+        try:
+            files = [".."] + sorted(os.listdir(path))
+        except Exception:
+            files = [".."]
+        stdscr.clear()
+        stdscr.addstr(0, 0, "Select file location (Enter: select, Tab: type filename, Esc: cancel)")
+        stdscr.addstr(1, 0, f"Current path: {path}")
+        max_y, max_x = stdscr.getmaxyx()
+        for idx, fname in enumerate(files):
+            if 2 + idx >= max_y - 2:
+                break  # Prevent overflow
+            if idx == selected:
+                stdscr.attron(curses.A_REVERSE)
+            stdscr.addstr(2 + idx, 2, fname[:max_x-4])
+            if idx == selected:
+                stdscr.attroff(curses.A_REVERSE)
+        if input_mode:
+            stdscr.addstr(max_y-2, 0, "Filename: " + filename)
+            stdscr.move(max_y-2, 10 + len(filename))
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if input_mode:
+            if key in (curses.KEY_ENTER, 10, 13):
+                curses.curs_set(0)
+                return os.path.join(path, filename)
+            elif key == 27:  # ESC
+                curses.curs_set(0)
+                return None
+            elif key in (curses.KEY_BACKSPACE, 127, 8):
+                filename = filename[:-1]
+            elif key == 9:  # Tab to exit input mode
+                input_mode = False
+            elif 32 <= key <= 126:
+                filename += chr(key)
+        else:
+            if key == curses.KEY_UP and selected > 0:
+                selected -= 1
+            elif key == curses.KEY_DOWN and selected < len(files) - 1:
+                selected += 1
+            elif key in (curses.KEY_ENTER, 10, 13):
+                chosen = files[selected]
+                full_path = os.path.join(path, chosen)
+                if os.path.isdir(full_path):
+                    path = os.path.abspath(full_path)
+                    selected = 0
+                else:
+                    curses.curs_set(0)
+                    return full_path
+            elif key == 9:  # Tab to enter filename input mode
+                input_mode = True
+                filename = ""
+            elif key == 27:  # ESC
+                curses.curs_set(0)
+                return None
+
 # Function to update the main display
 def update_main_display(win, pin_states, paused, logging_enabled):
     win.erase()
@@ -239,6 +306,8 @@ key_flash = {
 }
 FLASH_DURATION = 0.2  # seconds
 
+
+
 # Main loop
 try:
     pin_states = {pin: [0] * history_length for pin in pins}
@@ -298,6 +367,15 @@ try:
             for pin in pin_states:
                 pin_states[pin] = [0] * (history_length - len(pin_states[pin])) + pin_states[pin]
             key_flash[']'] = time.time()
+        elif key == ord('s'):
+            curses.curs_set(1)
+            new_db_path = file_requester(stdscr, db_path)
+            curses.curs_set(0)
+            if new_db_path:
+                db_path = os.path.dirname(new_db_path)
+                db_name = new_db_path
+                db_conn.close()
+                db_conn = init_db(db_name)
 
         if not paused:
             for pin in pins:
@@ -330,3 +408,4 @@ finally:
     curses.curs_set(1)  # Restore the cursor
     GPIO.cleanup()
     db_conn.close()
+
