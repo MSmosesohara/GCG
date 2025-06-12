@@ -182,42 +182,62 @@ def update_vector_display(win, pin_states, scale, directions):
     win.refresh()
 
 # Function to update the header display
-def update_header(win, paused, logging_enabled, polling_speed, history_length):
+def update_header(win, paused, logging_enabled, polling_speed, history_length, key_flash):
     win.erase()
     win.attron(curses.color_pair(5))
-    win.box()  # Draw a thin border
+    win.box()
     win.attroff(curses.color_pair(5))
-    help_text = (
-        "Keys: <v> Vectorscope  <p> Pause  <l> Logging  "
-        "[/]: History  -/+: Polling  <Ctrl+C> Quit"
-    )
-    status_text = (
-        f"PAUSED: {'YES' if paused else 'NO'}   "
-        f"LOGGING: {'YES' if logging_enabled else 'NO'}   "
-        f"POLLING: {polling_speed:.2f}s   "
-        f"HISTORY: {history_length}"
-    )
 
-    win_height, win_width = win.getmaxyx()
-    lines = [help_text]
-    while status_text:
-        if len(status_text) <= win_width - 2:  # -2 for border
-            lines.append(status_text)
-            break
-        split_at = status_text.rfind(' ', 0, win_width - 2)
-        if split_at == -1:
-            split_at = win_width - 2
-        lines.append(status_text[:split_at])
-        status_text = status_text[split_at:].lstrip()
+    now = time.time()
+    # Helper to flash a key label
+    def flash_label(label, key):
+        if now - key_flash.get(key, 0) < FLASH_DURATION:
+            win.attron(curses.color_pair(4) | curses.A_BOLD)
+            win.addstr(label)
+            win.attroff(curses.color_pair(4) | curses.A_BOLD)
+        else:
+            win.addstr(label, curses.A_BOLD)
 
-    for i, line in enumerate(lines):
-        if i + 1 < win_height - 1:  # Stay inside the border
-            win.addstr(i + 1, 1, line, curses.A_BOLD)
+    # Help text (no flashing here)
+    win.addstr(1, 1, "Keys: <v> Vectorscope <Ctrl+C> Quit")
+
+    # Status line with flashing for relevant keys
+    y, x = 2, 1
+    win.addstr(y, x, "PAUSED")
+    win.addstr("<p>: ")
+    win.addstr("YES" if paused else "NO", curses.A_BOLD)
+    win.addstr("   LOGGING")
+    win.addstr("<l>: ")
+    win.addstr("YES" if logging_enabled else "NO", curses.A_BOLD)
+    win.addstr("   POLLING")
+    flash_label("<", "-")
+    flash_label("-", "-")
+    win.addstr("/")
+    flash_label("+", "+")
+    flash_label(">", "+")
+    win.addstr(": ")
+    win.addstr(f"{polling_speed:.2f}s", curses.A_BOLD)
+    win.addstr("   HISTORY")
+    flash_label("<", "[")
+    flash_label("[", "[")
+    win.addstr("/")
+    flash_label("]", "]")
+    flash_label(">", "]")
+    win.addstr(": ")
+    win.addstr(str(history_length), curses.A_BOLD)
+
     win.refresh()
 
 # Read configuration
 labels, pins, polling_speed, history_length, db_path, scale, directions = read_config('config.txt')
 
+key_flash = {
+    '-': 0,
+    '+': 0,
+    '[': 0,
+    ']': 0,
+}
+FLASH_DURATION = 0.2  # seconds
 
 # Main loop
 try:
@@ -261,19 +281,23 @@ try:
             stdscr.refresh()
             # Force window recreation on toggle
             height, width = 0, 0
+        elif key == ord('-'):
+            polling_speed = max(0.01, polling_speed - 0.01)
+            key_flash['-'] = time.time()
+        elif key == ord('+') or key == ord('='):
+            polling_speed += 0.01
+            key_flash['+'] = time.time()
         elif key == ord('['):
             if history_length > 1:
                 history_length -= 1
                 for pin in pin_states:
                     pin_states[pin] = pin_states[pin][-history_length:]
+            key_flash['['] = time.time()
         elif key == ord(']'):
             history_length += 1
             for pin in pin_states:
                 pin_states[pin] = [0] * (history_length - len(pin_states[pin])) + pin_states[pin]
-        elif key == ord('-'):
-            polling_speed = max(0.01, polling_speed - 0.01)  # Don't go below 0.01s
-        elif key == ord('+') or key == ord('='):
-            polling_speed += 0.01
+            key_flash[']'] = time.time()
 
         if not paused:
             for pin in pins:
@@ -285,7 +309,7 @@ try:
                 log_gpio_values(db_conn, pin_states, labels)
 
         # Update the header panel
-        update_header(header_win, paused, logging_enabled, polling_speed, history_length)
+        update_header(header_win, paused, logging_enabled, polling_speed, history_length, key_flash)
 
         # Update the main display
         update_main_display(main_win, pin_states, paused, logging_enabled)
