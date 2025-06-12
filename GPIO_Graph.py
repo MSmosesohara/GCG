@@ -97,18 +97,40 @@ logging_enabled = False
 def update_main_display(win, pin_states, paused, logging_enabled):
     win.erase()
     help_text = (
-        "Keys: <p> Pause  <l> DB Logging  <v> Vectorscope  "
-        "[ Dec History  ] Inc History  - Dec Polling  + Inc Polling  <Ctrl+C> Quit"
+        "Keys:<v> Vectorscope  "
+        "<Ctrl+C> Quit"
     )
     win.addstr(0, 0, help_text, curses.A_BOLD)
 
-    row = 1
-    if paused:
-        win.addstr(row, 0, "PAUSED", curses.color_pair(3))
-        row += 1
-    if logging_enabled:
-        win.addstr(row, 10, "LOGGING ENABLED", curses.color_pair(4))
-        row += 1
+    # Build the status line
+    status_text = (
+        f"PAUSED<p>: {'YES' if paused else 'NO'}   "
+        f"LOGGING<l>: {'YES' if logging_enabled else 'NO'}   "
+        f"POLLING<-/+>: {polling_speed:.2f}s   "
+        f"HISTORY<[/]>: {history_length}"
+    )
+
+    # Get window width
+    win_height, win_width = win.getmaxyx()
+
+    # Split status_text into lines that fit the window width
+    status_lines = []
+    while status_text:
+        # Find the last space within the width limit
+        if len(status_text) <= win_width:
+            status_lines.append(status_text)
+            break
+        split_at = status_text.rfind(' ', 0, win_width)
+        if split_at == -1:
+            split_at = win_width  # No space found, hard split
+        status_lines.append(status_text[:split_at])
+        status_text = status_text[split_at:].lstrip()
+
+    # Print each status line
+    for i, line in enumerate(status_lines):
+        win.addstr(1 + i, 0, line, curses.A_BOLD)
+
+    row = 1 + len(status_lines)  # Start graph output below status lines
 
     max_label_length = max(len(label) for label in labels.values())
     graph_start_col = max_label_length + 15  # Adjust this value to align the graph correctly
