@@ -59,3 +59,6 @@ Ncurses on top of Python to render GPIO logic to the console.
 ## Screenshots
 
 ![Screenshot](/images/GCG_Logging_01.png)
+![Screenshot](/images/GCG_Logging_02.png)
+![Screenshot](/images/GCG_Logging_03.png)
+
