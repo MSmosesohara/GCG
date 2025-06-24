@@ -28,3 +28,6 @@ north:12
 south:16
 east:25
 west:23
+mcp_enable:1
+mcp_address:0x20
+mcp_bus:1

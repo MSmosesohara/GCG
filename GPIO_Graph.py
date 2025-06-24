@@ -15,6 +15,9 @@ def read_config(config_file):
     db_path = '.'  # Default database path
     scale = 2  # Default scale value
     directions = {'north': None, 'south': None, 'east': None, 'west': None}  # Default direction pins
+    mcp_enable = False
+    mcp_address = 0x20
+    mcp_bus = 1
 
     with open(config_file, 'r') as file:
         for line in file:
@@ -30,12 +33,18 @@ def read_config(config_file):
                     scale = int(value)
                 elif key in directions:
                     directions[key] = int(value)  # Map direction to pin
+                elif key == 'mcp_enable':
+                    mcp_enable = value.strip() == '1'
+                elif key == 'mcp_address':
+                    mcp_address = int(value, 0)  # auto-detect hex/dec
+                elif key == 'mcp_bus':
+                    mcp_bus = int(value)
                 else:
                     pin = int(key)
                     labels[pin] = value
                     pins.append(pin)
 
-    return labels, pins, polling_speed, history_length, db_path, scale, directions
+    return labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus
 
 # Function to initialize the SQLite database
 def init_db(db_name):
@@ -67,8 +76,7 @@ def log_gpio_values(conn, pin_states, labels):
 
 # Setup GPIO
 GPIO.setmode(GPIO.BCM)
-labels, pins, polling_speed, history_length, db_path, scale, directions = read_config('config.txt')  # Read labels, pins, polling speed, history length, and db path from config file
-
+labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus = read_config('config.txt')
 for pin in pins:
     GPIO.setup(pin, GPIO.IN)
 
@@ -166,20 +174,32 @@ def update_main_display(win, pin_states, paused, logging_enabled):
     win.erase()
 
     max_label_length = max(len(label) for label in labels.values())
-    graph_start_col = max_label_length + 15  # Adjust this value to align the graph correctly
+    graph_start_col = max_label_length + 15  # Use this for all graphs
 
-    row = 0  # Start at the top of the main panel
+    row = 0
 
+    # Standard GPIOs
     for idx, (pin, states) in enumerate(pin_states.items()):
         label = labels.get(pin, f"BCM {pin}")
-        win.addstr(idx + row, 0, f"{label.ljust(max_label_length)} BCM {pin}: ")
-        win.addstr(idx + row, graph_start_col, "")  # Align the start of the graph
+        win.addstr(idx + row, 0, f"{label.ljust(max_label_length)} BCM {pin}: ".ljust(graph_start_col))
         for state in states:
-            if state:
-                win.addstr("-", curses.color_pair(1))
-            else:
-                win.addstr("_", curses.color_pair(2))
+            win.addstr("-", curses.color_pair(1)) if state else win.addstr("_", curses.color_pair(2))
         win.addstr("\n")
+    row += len(pin_states)
+
+    # MCP23017 GPIOA
+    if mcp_enable:
+        for i in range(8):
+            win.addstr(row + i, 0, f"MCP23017_A{i}: ".ljust(graph_start_col))
+            for state in reversed(mcp_trace_a[i]):
+                win.addstr("-", curses.color_pair(1)) if state else win.addstr("_", curses.color_pair(2))
+            win.addstr("\n")
+        row += 8
+        for i in range(8):
+            win.addstr(row + i, 0, f"MCP23017_B{i}: ".ljust(graph_start_col))
+            for state in mcp_trace_b[i]:
+                win.addstr("-", curses.color_pair(1)) if state else win.addstr("_", curses.color_pair(2))
+            win.addstr("\n")
     win.refresh()
 
 # Function to update the vectorscope display
@@ -296,7 +316,7 @@ def update_header(win, paused, logging_enabled, polling_speed, history_length, k
     win.refresh()
 
 # Read configuration
-labels, pins, polling_speed, history_length, db_path, scale, directions = read_config('config.txt')
+labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus = read_config('config.txt')
 
 key_flash = {
     '-': 0,
@@ -319,6 +339,26 @@ try:
     header_win = curses.newwin(header_height, width, 0, 0)
     main_win = curses.newwin(height - header_height, width, header_height, 0)
     vector_win = None
+
+    if mcp_enable:
+        import smbus2
+        bus = smbus2.SMBus(mcp_bus)
+        mcp_trace_a = [[] for _ in range(8)]
+        mcp_trace_b = [[] for _ in range(8)]
+
+        def read_mcp_gpio():
+            try:
+                gpio_a = bus.read_byte_data(mcp_address, 0x12)
+                gpio_b = bus.read_byte_data(mcp_address, 0x13)
+                return gpio_a, gpio_b
+            except Exception:
+                return 0, 0
+
+        def update_mcp_trace(trace, gpio, trace_length):
+            for i in range(8):
+                trace[i].append(1 if (gpio & (1 << i)) else 0)
+                if len(trace[i]) > trace_length:
+                    trace[i].pop(0)
 
     while True:
         # Check if window size or vector_graph_visible changed, and recreate windows if needed
@@ -361,11 +401,21 @@ try:
                 history_length -= 1
                 for pin in pin_states:
                     pin_states[pin] = pin_states[pin][-history_length:]
+                # Add this for MCP traces:
+                if mcp_enable:
+                    for i in range(8):
+                        mcp_trace_a[i] = mcp_trace_a[i][-history_length:]
+                        mcp_trace_b[i] = mcp_trace_b[i][-history_length:]
             key_flash['['] = time.time()
         elif key == ord(']'):
             history_length += 1
             for pin in pin_states:
                 pin_states[pin] = [0] * (history_length - len(pin_states[pin])) + pin_states[pin]
+            # Add this for MCP traces:
+            if mcp_enable:
+                for i in range(8):
+                    mcp_trace_a[i] = [0] * (history_length - len(mcp_trace_a[i])) + mcp_trace_a[i]
+                    mcp_trace_b[i] = [0] * (history_length - len(mcp_trace_b[i])) + mcp_trace_b[i]
             key_flash[']'] = time.time()
         elif key == ord('s'):
             curses.curs_set(1)
@@ -399,6 +449,11 @@ try:
             vector_win.erase()
             vector_win.refresh()
 
+        if mcp_enable and not paused:
+            gpio_a, gpio_b = read_mcp_gpio()
+            update_mcp_trace(mcp_trace_a, gpio_a, history_length)
+            update_mcp_trace(mcp_trace_b, gpio_b, history_length)
+
         time.sleep(polling_speed)
 finally:
     curses.nocbreak()
@@ -408,4 +463,6 @@ finally:
     curses.curs_set(1)  # Restore the cursor
     GPIO.cleanup()
     db_conn.close()
+    if mcp_enable:
+        bus.close()
 
