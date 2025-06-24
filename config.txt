@@ -19,8 +19,12 @@
 13:SpinMotorOnPin
 5:MonitorPlatterSpeed
 18:AgitatorMotor
+mcp_a0:ButtonA
+mcp_a1:ButtonB
+mcp_b0:Relay1
+mcp_b1:Relay2
 polling_speed:0.1
-history_length:150
+history_length:40
 db_path:/var/lib/arcade
 scale:10
 # Directional mappings for the vectorscope

@@ -10,6 +10,8 @@ import os
 def read_config(config_file):
     labels = {}
     pins = []
+    mcp_labels_a = {}
+    mcp_labels_b = {}
     polling_speed = 0.1  # Default polling speed
     history_length = 50  # Default history length
     db_path = '.'  # Default database path
@@ -23,6 +25,8 @@ def read_config(config_file):
         for line in file:
             if ':' in line:
                 key, value = line.strip().split(':', 1)
+                key = key.strip()
+                value = value.strip()
                 if key == 'polling_speed':
                     polling_speed = float(value)
                 elif key == 'history_length':
@@ -39,12 +43,18 @@ def read_config(config_file):
                     mcp_address = int(value, 0)  # auto-detect hex/dec
                 elif key == 'mcp_bus':
                     mcp_bus = int(value)
-                else:
+                elif key.startswith('mcp_a') and key[6:].isdigit():
+                    idx = int(key[6:])
+                    mcp_labels_a[idx] = value
+                elif key.startswith('mcp_b') and key[6:].isdigit():
+                    idx = int(key[6:])
+                    mcp_labels_b[idx] = value
+                elif key.isdigit():
                     pin = int(key)
                     labels[pin] = value
                     pins.append(pin)
 
-    return labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus
+    return labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b
 
 # Function to initialize the SQLite database
 def init_db(db_name):
@@ -76,7 +86,7 @@ def log_gpio_values(conn, pin_states, labels):
 
 # Setup GPIO
 GPIO.setmode(GPIO.BCM)
-labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus = read_config('config.txt')
+labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b  = read_config('config.txt')
 for pin in pins:
     GPIO.setup(pin, GPIO.IN)
 
@@ -190,13 +200,15 @@ def update_main_display(win, pin_states, paused, logging_enabled):
     # MCP23017 GPIOA
     if mcp_enable:
         for i in range(8):
-            win.addstr(row + i, 0, f"MCP23017_A{i}: ".ljust(graph_start_col))
+            label = mcp_labels_a.get(i, f"MCP23017_A{i}")
+            win.addstr(row + i, 0, f"{label}: ".ljust(graph_start_col))
             for state in reversed(mcp_trace_a[i]):
                 win.addstr("-", curses.color_pair(1)) if state else win.addstr("_", curses.color_pair(2))
             win.addstr("\n")
         row += 8
         for i in range(8):
-            win.addstr(row + i, 0, f"MCP23017_B{i}: ".ljust(graph_start_col))
+            label = mcp_labels_b.get(i, f"MCP23017_B{i}")
+            win.addstr(row + i, 0, f"{label}: ".ljust(graph_start_col))
             for state in mcp_trace_b[i]:
                 win.addstr("-", curses.color_pair(1)) if state else win.addstr("_", curses.color_pair(2))
             win.addstr("\n")
@@ -316,7 +328,7 @@ def update_header(win, paused, logging_enabled, polling_speed, history_length, k
     win.refresh()
 
 # Read configuration
-labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus = read_config('config.txt')
+labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b = read_config('config.txt')
 
 key_flash = {
     '-': 0,
