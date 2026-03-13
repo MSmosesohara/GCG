@@ -1,0 +1,22 @@
+18:Credit
+4:Game In Use
+6:Ticket Driver
+24:Ticket Notch
+23:Drop
+27:Wheel_Home
+5:Encoder
+17:Score
+13:SuperBonus_Score
+19:Chaos_Score
+polling_speed:0.1
+history_length:100
+db_path:/var/lib/arcade
+scale:10
+#Directionalmappingsforthevectorscope
+north:12
+south:16
+east:25
+west:23
+mcp_enable:0
+mcp_address:0x20
+mcp_bus:1
