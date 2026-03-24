@@ -1,0 +1,17 @@
+5:HomeSensorPin
+14:STM32ResetPin
+15:STM32Boot0Pin
+17:BallStopDownSensorPin
+23:TicketErrorResetPin
+25:GameBoardResetPin
+27:EncoderPin
+polling_speed:0.1
+history_length:40
+db_path:/var/lib/arcade
+scale:10
+newest_on_right:1
+mcp_newest_on_right:1
+mcp_enable:0
+mcp_address:0x20
+mcp_bus:1
+mcp_invert:0

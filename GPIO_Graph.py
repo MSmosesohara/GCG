@@ -5,6 +5,17 @@ import sqlite3
 from datetime import datetime
 import socket
 import os
+import sys
+
+
+def resolve_config_file(argv):
+    config_file = argv[1] if len(argv) > 1 else 'config.gcg'
+    if not os.path.splitext(config_file)[1]:
+        config_file = f"{config_file}.gcg"
+    return config_file
+
+
+CONFIG_FILE = resolve_config_file(sys.argv)
 
 # Function to read labels and settings from config file
 def read_config(config_file):
@@ -43,11 +54,11 @@ def read_config(config_file):
                     mcp_address = int(value, 0)  # auto-detect hex/dec
                 elif key == 'mcp_bus':
                     mcp_bus = int(value)
-                elif key.startswith('mcp_a') and key[6:].isdigit():
-                    idx = int(key[6:])
+                elif key.startswith('mcp_a') and key[5:].isdigit():
+                    idx = int(key[5:])
                     mcp_labels_a[idx] = value
-                elif key.startswith('mcp_b') and key[6:].isdigit():
-                    idx = int(key[6:])
+                elif key.startswith('mcp_b') and key[5:].isdigit():
+                    idx = int(key[5:])
                     mcp_labels_b[idx] = value
                 elif key.isdigit():
                     pin = int(key)
@@ -86,7 +97,7 @@ def log_gpio_values(conn, pin_states, labels):
 
 # Setup GPIO
 GPIO.setmode(GPIO.BCM)
-labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b  = read_config('config.txt')
+labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b  = read_config(CONFIG_FILE)
 for pin in pins:
     GPIO.setup(pin, GPIO.IN)
 
@@ -328,7 +339,7 @@ def update_header(win, paused, logging_enabled, polling_speed, history_length, k
     win.refresh()
 
 # Read configuration
-labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b = read_config('config.txt')
+labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b = read_config(CONFIG_FILE)
 
 key_flash = {
     '-': 0,
