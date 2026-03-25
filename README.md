@@ -1,4 +1,4 @@
-﻿# GCG - GPIO Charts
+# GCG - GPIO Charts
 
 Terminal UI for monitoring Raspberry Pi GPIO and optional MCP23017 I/O states in real time.
 
@@ -133,6 +133,7 @@ mcp_enable:1
 mcp_address:0x20
 mcp_bus:1
 ```
+
 
 - `mcp_enable`: `1` enables MCP polling, `0` disables.
 - `mcp_address`: Supports hex (`0x20`) or decimal.

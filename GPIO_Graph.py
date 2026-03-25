@@ -7,7 +7,6 @@ import socket
 import os
 import sys
 
-
 def resolve_config_file(argv):
     config_file = argv[1] if len(argv) > 1 else 'config.gcg'
     if not os.path.splitext(config_file)[1]:
@@ -31,6 +30,9 @@ def read_config(config_file):
     mcp_enable = False
     mcp_address = 0x20
     mcp_bus = 1
+    mcp_invert = False
+    newest_on_right = True
+    mcp_newest_on_right = True
 
     with open(config_file, 'r') as file:
         for line in file:
@@ -54,6 +56,12 @@ def read_config(config_file):
                     mcp_address = int(value, 0)  # auto-detect hex/dec
                 elif key == 'mcp_bus':
                     mcp_bus = int(value)
+                elif key == 'mcp_invert':
+                    mcp_invert = value.strip() == '1'
+                elif key == 'newest_on_right':
+                    newest_on_right = value.strip() == '1'
+                elif key == 'mcp_newest_on_right':
+                    mcp_newest_on_right = value.strip() == '1'
                 elif key.startswith('mcp_a') and key[5:].isdigit():
                     idx = int(key[5:])
                     mcp_labels_a[idx] = value
@@ -65,7 +73,7 @@ def read_config(config_file):
                     labels[pin] = value
                     pins.append(pin)
 
-    return labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b
+    return labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b, newest_on_right, mcp_invert, mcp_newest_on_right
 
 # Function to initialize the SQLite database
 def init_db(db_name):
@@ -97,7 +105,7 @@ def log_gpio_values(conn, pin_states, labels):
 
 # Setup GPIO
 GPIO.setmode(GPIO.BCM)
-labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b  = read_config(CONFIG_FILE)
+labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b, newest_on_right, mcp_invert, mcp_newest_on_right  = read_config(CONFIG_FILE)
 for pin in pins:
     GPIO.setup(pin, GPIO.IN)
 
@@ -194,35 +202,53 @@ def file_requester(stdscr, initial_path="."):
 def update_main_display(win, pin_states, paused, logging_enabled):
     win.erase()
 
-    max_label_length = max(len(label) for label in labels.values())
+    max_y, max_x = win.getmaxyx()
+    max_label_length = max((len(label) for label in labels.values()), default=8)
     graph_start_col = max_label_length + 15  # Use this for all graphs
+    graph_width = max(0, max_x - graph_start_col - 1)
+
+    def draw_trace_line(y, label_text, states, newest_right):
+        if y < 0 or y >= max_y:
+            return False
+
+        header = label_text[:max(0, graph_start_col)].ljust(graph_start_col)
+        try:
+            win.addstr(y, 0, header)
+        except curses.error:
+            return False
+
+        trace_states = states if newest_right else reversed(states)
+        x = graph_start_col
+        for state in trace_states:
+            if x >= max_x - 1:
+                break
+            try:
+                win.addch(y, x, '-' if state else '_', curses.color_pair(1) if state else curses.color_pair(2))
+            except curses.error:
+                break
+            x += 1
+        return True
 
     row = 0
 
     # Standard GPIOs
     for idx, (pin, states) in enumerate(pin_states.items()):
         label = labels.get(pin, f"BCM {pin}")
-        win.addstr(idx + row, 0, f"{label.ljust(max_label_length)} BCM {pin}: ".ljust(graph_start_col))
-        for state in states:
-            win.addstr("-", curses.color_pair(1)) if state else win.addstr("_", curses.color_pair(2))
-        win.addstr("\n")
+        if not draw_trace_line(idx + row, f"{label.ljust(max_label_length)} BCM {pin}: ", states, newest_on_right):
+            break
     row += len(pin_states)
 
     # MCP23017 GPIOA
     if mcp_enable:
         for i in range(8):
             label = mcp_labels_a.get(i, f"MCP23017_A{i}")
-            win.addstr(row + i, 0, f"{label}: ".ljust(graph_start_col))
-            for state in reversed(mcp_trace_a[i]):
-                win.addstr("-", curses.color_pair(1)) if state else win.addstr("_", curses.color_pair(2))
-            win.addstr("\n")
+            if not draw_trace_line(row + i, f"{label}: ", mcp_trace_a[i], mcp_newest_on_right):
+                break
         row += 8
         for i in range(8):
             label = mcp_labels_b.get(i, f"MCP23017_B{i}")
-            win.addstr(row + i, 0, f"{label}: ".ljust(graph_start_col))
-            for state in mcp_trace_b[i]:
-                win.addstr("-", curses.color_pair(1)) if state else win.addstr("_", curses.color_pair(2))
-            win.addstr("\n")
+            if not draw_trace_line(row + i, f"{label}: ", mcp_trace_b[i], mcp_newest_on_right):
+                break
     win.refresh()
 
 # Function to update the vectorscope display
@@ -309,7 +335,11 @@ def update_header(win, paused, logging_enabled, polling_speed, history_length, k
             win.addstr(label, curses.A_BOLD)
 
     # Help text (no flashing here)
-    win.addstr(1, 1, "Keys: <v> Vectorscope <Ctrl+C> Quit")
+    direction_label = "R" if newest_on_right else "L"
+    mcp_direction_label = "R" if mcp_newest_on_right else "L"
+    invert_label = "1" if mcp_invert else "0"
+    help_text = f"Keys: <v> Vectorscope <Ctrl+C> Quit  CFG:{os.path.basename(CONFIG_FILE)} DIR:{direction_label} MCPDIR:{mcp_direction_label} MCPINV:{invert_label}"
+    win.addstr(1, 1, help_text[:max(1, win.getmaxyx()[1] - 2)])
 
     # Status line with flashing for relevant keys
     y, x = 2, 1
@@ -339,7 +369,7 @@ def update_header(win, paused, logging_enabled, polling_speed, history_length, k
     win.refresh()
 
 # Read configuration
-labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b = read_config(CONFIG_FILE)
+labels, pins, polling_speed, history_length, db_path, scale, directions, mcp_enable, mcp_address, mcp_bus, mcp_labels_a, mcp_labels_b, newest_on_right, mcp_invert, mcp_newest_on_right = read_config(CONFIG_FILE)
 
 key_flash = {
     '-': 0,
@@ -379,7 +409,10 @@ try:
 
         def update_mcp_trace(trace, gpio, trace_length):
             for i in range(8):
-                trace[i].append(1 if (gpio & (1 << i)) else 0)
+                bit = 1 if (gpio & (1 << i)) else 0
+                if mcp_invert:
+                    bit = 0 if bit else 1
+                trace[i].append(bit)
                 if len(trace[i]) > trace_length:
                     trace[i].pop(0)
 
@@ -456,6 +489,14 @@ try:
                 pin_states[pin].append(state)
                 if len(pin_states[pin]) > history_length:
                     pin_states[pin].pop(0)
+
+            # Update MCP traces in the same phase as normal GPIO sampling
+            # so both graph types advance in the same on-screen direction.
+            if mcp_enable:
+                gpio_a, gpio_b = read_mcp_gpio()
+                update_mcp_trace(mcp_trace_a, gpio_a, history_length)
+                update_mcp_trace(mcp_trace_b, gpio_b, history_length)
+
             if logging_enabled:
                 log_gpio_values(db_conn, pin_states, labels)
 
@@ -471,11 +512,6 @@ try:
         elif vector_win:
             vector_win.erase()
             vector_win.refresh()
-
-        if mcp_enable and not paused:
-            gpio_a, gpio_b = read_mcp_gpio()
-            update_mcp_trace(mcp_trace_a, gpio_a, history_length)
-            update_mcp_trace(mcp_trace_b, gpio_b, history_length)
 
         time.sleep(polling_speed)
 finally:
